@@ -11,5 +11,5 @@ export interface Poll {
   title: string;
   created_at: string;
   options: string[];    
-  votes: Vote[];       
+  votes: Vote[];
 }
