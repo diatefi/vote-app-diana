@@ -1,22 +1,41 @@
 class Api::V1::PollsController < ApplicationController
+  # GET /api/v1/polls
   def index
     render json: Poll.all, include: :votes
   end
 
+  # GET /api/v1/polls/:id
   def show
     poll = Poll.find(params[:id])
-    render json: poll, include: :votes
+    opts = poll.votes.pluck(:option).uniq
+    render json: poll.as_json.merge(options: opts), include: :votes
   end
 
+  # POST /api/v1/polls
   def create
-    # создаём сам опрос
     poll = Poll.new(title: poll_params[:title])
     if poll.save
-      # создаём варианты как голоса
-      (poll_params[:options] || []).each do |opt|
-        poll.votes.create!(option: opt)
-      end
+      (poll_params[:options] || []).each { |opt| poll.votes.create!(option: opt) }
       render json: poll, include: :votes, status: :created
+    else
+      render json: { errors: poll.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # PATCH /api/v1/polls/:id
+  def update
+    poll = Poll.find(params[:id])
+    if poll.update(title: poll_params[:title])
+      new_opts = poll_params[:options] || []
+      old_opts = poll.votes.pluck(:option).uniq
+
+      # удаляем опции
+      (old_opts - new_opts).each { |opt| poll.votes.where(option: opt).destroy_all }
+      # добавляем новые
+      (new_opts - old_opts).each { |opt| poll.votes.create!(option: opt) }
+
+      opts = poll.votes.pluck(:option).uniq
+      render json: poll.as_json.merge(options: opts), include: :votes
     else
       render json: { errors: poll.errors.full_messages }, status: :unprocessable_entity
     end
